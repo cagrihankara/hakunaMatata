@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: Hakuna Matata Stack
+Resources:
+  S3SourceBucket:
+    Type: AWS::S3::Bucket
+    Description: Creating Amazon S3 bucket from CloudFormation
+    Properties:
+      BucketName: source-s3-bucket123454321
+  S3TargetBucket:
+    Type: AWS::S3::Bucket
+    Description: Creating Amazon S3 bucket from CloudFormation
+    Properties:
+      BucketName: target-s3-bucket123454321
+  HakunaMatataDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: hakunaMatata_table
+      AttributeDefinitions:
+        -
+          AttributeName: "PK_UploadedFileName"
+          AttributeType: "S"
+      KeySchema:
+        - 
+          AttributeName: "PK_UploadedFileName"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5 
+  HakunaMatataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: hakuna_matata_function
+      Handler: index.handler
+      Runtime: nodejs12.x
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt HakunaMatataFunctionRole.Arn
+      CodeUri:
+        Bucket: lambda-s3-bucket123454321
+        Key: jobs/deneme.zip
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0634e60cb1b41a973
+        SubnetIds:
+          - subnet-0dee549efa7046ebf
+      Events:
+        CopyTrigger:
+          Type: S3
+          Properties:
+            Bucket: !Ref S3SourceBucket
+            Events: s3:ObjectCreated:*
+  HakunaMatataPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName: !GetAtt
+        - HakunaMatataFunction
+        - Arn
+      Principal: s3.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:s3:::source-s3-bucket123454321
+  HakunaMatataFunctionRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: HakunaMatataFunctionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: HakunaMatataFunctionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:*
+            Resource: arn:aws:logs:*:*:*
+      - PolicyName: HakunaMatataFunctionVpcPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DeleteNetworkInterface
+            Resource: "*"
+      - PolicyName: HakunaMatataFunctionDynamoDBPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Sid: SpecificTable
+            Effect: Allow
+            Action:
+            - dynamodb:PutItem
+            Resource: !GetAtt HakunaMatataDynamoDBTable.Arn
+      - PolicyName: HakunaMatataS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectAcl
+              - s3:PutObjectAcl
+              - s3:PutObject
+              - s3:ListAllMyBuckets
+              - s3:GetBucketLocation
+            Resource:
+              - !Sub arn:aws:s3:::source-s3-bucket123454321
+              - !Sub arn:aws:s3:::target-s3-bucket123454321
